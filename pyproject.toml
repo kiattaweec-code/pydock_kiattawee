@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "pydock"
+version = "0.1.0"
+description = "Flexible-ligand molecular docking with a genetic algorithm"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "numba>=0.58",
+    "rdkit>=2023.3",
+]
+[project.scripts]
+pydock = "pydock_app.launcher:main"
+pydock-cli = "pydock.cli:main"
+[project.optional-dependencies]
+web = ["fastapi>=0.110", "uvicorn>=0.27", "python-multipart>=0.0.9"]
+app = ["fastapi>=0.110", "uvicorn>=0.27", "python-multipart>=0.0.9", "pywebview>=5.0"]
+build = ["pyinstaller>=6.0", "pillow>=10.0"]
+[tool.setuptools]
+packages = ["pydock", "pydock_web", "pydock_app",
+            "pydock_web.static", "pydock_web.static.vendor"]
+[tool.setuptools.package-data]
+pydock_web = ["static/*", "static/vendor/*"]
+"pydock_web.static" = ["*"]
+"pydock_web.static.vendor" = ["*"]

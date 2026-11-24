@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pydock</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <h1>pydock</h1>
+    <span class="tag">flexible-ligand docking</span>
+  </div>
+  <div class="env" id="env">checking engine&hellip;</div>
+</header>
+
+<main class="layout">
+
+  <!-- ------------------------------------------------ setup ----------- -->
+  <aside class="panel setup">
+    <form id="form" autocomplete="off">
+
+      <section>
+        <h2>Structures</h2>
+        <label class="file">
+          <span class="lab">Receptor <em>.pdb</em></span>
+          <input type="file" name="receptor" accept=".pdb,.ent" required>
+        </label>
+        <label class="file">
+          <span class="lab">Ligands <em>.sdf .mol2 .mol .smi</em></span>
+          <input type="file" name="ligands" multiple
+                 accept=".sdf,.mol,.mol2,.pdb,.smi,.smiles" required>
+        </label>
+      </section>
+
+      <section>
+        <h2>Binding site</h2>
+        <div class="seg" role="tablist" id="siteMode">
+          <button type="button" class="on" data-mode="reference">Reference ligand</button>
+          <button type="button" data-mode="centre">Coordinates</button>
+          <button type="button" data-mode="residues">Residues</button>
+        </div>
+
+        <div class="mode" data-mode="reference">
+          <label class="file">
+            <span class="lab">Reference ligand <em>defines the site, reports RMSD</em></span>
+            <input type="file" name="reference"
+                   accept=".sdf,.mol,.mol2,.pdb">
+          </label>
+          <label class="num">
+            <span class="lab">Box padding <em>Å</em></span>
+            <input type="number" name="padding" value="4.0" step="0.5" min="0" max="15">
+          </label>
+        </div>
+
+        <div class="mode hidden" data-mode="centre">
+          <span class="lab">Box centre <em>Å</em></span>
+          <div class="triple">
+            <label class="num"><span class="lab">X</span>
+              <input type="number" name="centre_x" step="any" value="0"></label>
+            <label class="num"><span class="lab">Y</span>
+              <input type="number" name="centre_y" step="any" value="0"></label>
+            <label class="num"><span class="lab">Z</span>
+              <input type="number" name="centre_z" step="any" value="0"></label>
+          </div>
+          <span class="lab">Box size <em>Å</em></span>
+          <div class="triple">
+            <label class="num"><span class="lab">W</span>
+              <input type="number" name="size_x" step="any" min="6" max="80" value="22"></label>
+            <label class="num"><span class="lab">H</span>
+              <input type="number" name="size_y" step="any" min="6" max="80" value="22"></label>
+            <label class="num"><span class="lab">D</span>
+              <input type="number" name="size_z" step="any" min="6" max="80" value="22"></label>
+          </div>
+          <p class="hint">Upload a receptor and the box appears in the
+            <strong>Binding site</strong> panel, where you can drag it into
+            place.</p>
+        </div>
+
+        <div class="mode hidden" data-mode="residues">
+          <label class="num">
+            <span class="lab">Residues <em>chain:number, space separated</em></span>
+            <input type="text" name="site_residues" placeholder="A:129 A:201 A:330">
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Scoring</h2>
+        <div class="radios">
+          <label><input type="radio" name="scoring" value="empirical" checked>
+            <span><strong>Empirical</strong><em>ChemScore-style: H-bond, metal,
+              lipophilic, rotor penalty</em></span></label>
+          <label><input type="radio" name="scoring" value="chemplp">
+            <span><strong>ChemPLP</strong><em>empirical plus a piecewise-linear
+              shape term</em></span></label>
+          <label><input type="radio" name="scoring" value="forcefield">
+            <span><strong>Force field</strong><em>AutoDock-style: vdW,
+              electrostatics, desolvation</em></span></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Search</h2>
+        <div class="grid2">
+          <label class="num"><span class="lab">GA runs</span>
+            <input type="number" name="n_runs" value="10" min="1" max="50"></label>
+          <label class="num"><span class="lab">Poses kept</span>
+            <input type="number" name="n_poses" value="5" min="1" max="50"></label>
+          <label class="num"><span class="lab">Evaluations / run</span>
+            <input type="number" name="n_evals" value="250000" min="0" max="2000000"
+                   step="10000" placeholder="auto"></label>
+          <label class="num"><span class="lab">Population</span>
+            <input type="number" name="pop_size" value="100" min="10" max="500"></label>
+          <label class="num"><span class="lab">Islands</span>
+            <input type="number" name="n_islands" value="5" min="1" max="20"></label>
+          <label class="num"><span class="lab">Seed</span>
+            <input type="number" name="seed" value="1" min="0"></label>
+        </div>
+        <p class="hint">Leave evaluations at 0 to scale the budget
+          automatically with ligand flexibility.</p>
+        <details>
+          <summary>Advanced</summary>
+          <div class="checks">
+            <label><input type="checkbox" name="detect_cavity" checked>
+              Detect the cavity and search only inside it</label>
+            <label><input type="checkbox" name="rotate_receptor_oh" checked>
+              Let receptor hydroxyls rotate</label>
+            <label><input type="checkbox" name="keep_waters">
+              Keep crystallographic waters</label>
+          </div>
+          <label class="num"><span class="lab">Grid spacing <em>Å</em></span>
+            <input type="number" name="spacing" value="0.4" step="0.05"
+                   min="0.2" max="1.0"></label>
+        </details>
+      </section>
+
+      <div class="actions">
+        <button type="submit" class="primary" id="go">Dock</button>
+        <button type="button" id="example">Run bundled example</button>
+      </div>
+      <p class="err hidden" id="formErr"></p>
+    </form>
+  </aside>
+
+  <!-- ------------------------------------------------ results --------- -->
+  <section class="main">
+
+    <!-- --------------------------------------------- box editor ------- -->
+    <div class="panel siteCard hidden" id="siteCard">
+      <div class="viewerHead">
+        <div class="tabs">
+          <strong class="siteTitle">Binding site</strong>
+          <span class="muted" id="siteMeta"></span>
+        </div>
+        <div class="viewOpts">
+          <label><input type="checkbox" id="sitePick"> click to centre</label>
+          <button type="button" class="ghost" id="siteFitRef" disabled>Fit reference</button>
+          <button type="button" class="ghost" id="siteWhole">Whole protein</button>
+          <button type="button" class="ghost" id="siteRecentre">Recentre view</button>
+        </div>
+      </div>
+
+      <div class="pockets" id="pockets"></div>
+
+      <div class="viewerWrap">
+        <div id="siteViewer"></div>
+        <div class="viewerNote hidden" id="siteNote"></div>
+        <div class="legend" id="siteLegend"></div>
+      </div>
+
+      <div class="boxControls">
+        <div class="axisRow">
+          <span class="axisLab">Centre</span>
+          <div class="sliders" id="centreSliders"></div>
+        </div>
+        <div class="axisRow">
+          <span class="axisLab">Size</span>
+          <div class="sliders" id="sizeSliders"></div>
+        </div>
+        <p class="boxReadout muted" id="boxReadout"></p>
+      </div>
+    </div>
+
+    <!-- --------------------------------------------- screening -------- -->
+    <div class="panel screenCard hidden" id="screenCard">
+      <div class="viewerHead">
+        <div class="tabs"><strong class="siteTitle">Screening</strong>
+          <span class="muted" id="screenMeta"></span></div>
+        <div class="viewOpts">
+          <label><input type="checkbox" id="byEfficiency"> rank by ligand efficiency</label>
+          <a class="ghost" id="dlRanking" download>Download CSV</a>
+        </div>
+      </div>
+      <div class="tableWrap">
+        <table id="screenTable">
+          <thead><tr>
+            <th>#</th><th>Ligand</th><th>Score</th><th>LE</th>
+            <th>Heavy</th><th>Rotors</th><th>Modes</th><th>RMSD</th><th>Time</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel status hidden" id="statusCard">
+      <div class="statusHead">
+        <div>
+          <span class="dot" id="dot"></span>
+          <strong id="statusText">queued</strong>
+          <span class="muted" id="statusMeta"></span>
+        </div>
+        <button type="button" id="cancel" class="ghost hidden">Cancel</button>
+      </div>
+      <div class="bar"><div class="fill" id="fill"></div></div>
+      <pre class="log" id="log" aria-live="polite"></pre>
+    </div>
+
+    <div class="panel viewerCard hidden" id="viewerCard">
+      <div class="viewerHead">
+        <div class="tabs" id="ligTabs"></div>
+        <div class="viewOpts">
+          <label><input type="checkbox" id="optRef" checked> reference</label>
+          <label><input type="checkbox" id="optPocket" checked> pocket</label>
+          <label><input type="checkbox" id="optSurface"> surface</label>
+          <button type="button" class="ghost" id="reset">Recentre</button>
+          <a class="ghost" id="dl" download>Download SDF</a>
+        </div>
+      </div>
+      <div class="viewerWrap">
+        <div id="viewer"></div>
+        <div class="viewerNote hidden" id="viewerNote"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="tableWrap">
+        <table id="poseTable">
+          <thead><tr>
+            <th>Pose</th><th>Score</th><th>RMSD</th><th>Run</th><th>Terms</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="summary muted" id="summary"></p>
+    </div>
+
+    <div class="panel intro" id="intro">
+      <h2>Dock a ligand in the browser</h2>
+      <p>Upload a receptor and one or more ligands, say where the binding site
+        is, and the engine searches ligand conformation, position and
+        orientation with a genetic algorithm &mdash; rotating receptor
+        hydroxyls along the way.</p>
+      <ul>
+        <li><strong>Flexible ligand.</strong> Every rotatable bond is a search
+          variable, built into a torsion tree.</li>
+        <li><strong>Cavity detection.</strong> The search is confined to the
+          detected pocket rather than the whole box, which is worth more than
+          any other single setting.</li>
+        <li><strong>Two scoring functions.</strong> Switchable per run, with a
+          per-term breakdown reported for every pose.</li>
+        <li><strong>See the box before you run.</strong> Upload a receptor and
+          the pockets are detected for you; drag the docking box into place
+          and watch it move in 3D.</li>
+        <li><strong>Screen a library.</strong> Drop in an SDF with many
+          molecules, or several files, and every one is docked and ranked.</li>
+      </ul>
+      <p class="hint">No files to hand? <button type="button" class="link"
+        id="example2">run the bundled example</button> &mdash; redocking
+        ergotamine into the receptor site it came from, 43 heavy atoms and
+        7 rotatable bonds.</p>
+    </div>
+
+    <div class="panel jobsCard hidden" id="jobsCard">
+      <h2>Recent jobs</h2>
+      <ul class="jobs" id="jobs"></ul>
+    </div>
+
+  </section>
+</main>
+
+<!-- 3Dmol.js is vendored so the app works with no internet access; the CDN
+     is only a fallback if the local copy is missing. -->
+<script src="vendor/3Dmol-min.js"></script>
+<script>
+  if (!window.$3Dmol) {
+    document.write('<script src="https://3Dmol.org/build/3Dmol-min.js"><\/script>');
+  }
+</script>
+<script src="app.js"></script>
+</body>
+</html>
