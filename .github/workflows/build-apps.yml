@@ -12,6 +12,15 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a release under this tag (blank = build only)"
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark the release as a pre-release"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -95,7 +104,10 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Either a pushed tag, or a manual run that named a tag.  The runner's
+    # own GITHUB_TOKEN creates the tag and the release, which is what makes
+    # this work from an environment that cannot push tags itself.
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -107,7 +119,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
-          draft: true
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          name: pydock ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          draft: false
+          prerelease: ${{ inputs.prerelease || false }}
           generate_release_notes: true
           body: |
             Desktop builds of pydock.
