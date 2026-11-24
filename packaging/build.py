@@ -256,25 +256,77 @@ def package_macos(app: Path) -> list[Path]:
         shutil.copy(bg, staging / ".background" / "bg.png")
 
     volume = f"pydock {VERSION}"
-    # Write to a read-write image first so Finder can arrange the icons, then
-    # convert to the compressed read-only image that ships.
-    run(["hdiutil", "create", "-volname", volume, "-srcfolder", str(staging),
-         "-ov", "-fs", "HFS+", "-format", "UDRW", str(tmp_dmg)])
-    mount = subprocess.run(["hdiutil", "attach", str(tmp_dmg), "-readwrite",
-                            "-noverify", "-noautoopen"],
-                           capture_output=True, text=True)
-    if mount.returncode == 0:
-        try:
-            _layout_dmg(volume)
-        finally:
-            subprocess.run(["hdiutil", "detach", f"/Volumes/{volume}"],
-                           capture_output=True)
-    run(["hdiutil", "convert", str(tmp_dmg), "-format", "UDZO",
-         "-imagekey", "zlib-level=9", "-o", str(dmg)])
+    if not _pretty_dmg(staging, tmp_dmg, dmg, volume):
+        # The laid-out route failed; build the image in one shot instead.
+        # Plainer window, same contents, and it cannot get stuck on a mount.
+        print("  falling back to a plain disk image")
+        dmg.unlink(missing_ok=True)
+        run(["hdiutil", "create", "-volname", volume, "-srcfolder",
+             str(staging), "-ov", "-format", "UDZO", str(dmg)])
 
     tmp_dmg.unlink(missing_ok=True)
     shutil.rmtree(staging, ignore_errors=True)
     return [dmg]
+
+
+def _detach(device: str | None, volume: str) -> bool:
+    """Detach the image and wait for the kernel to let go of it.
+
+    `hdiutil convert` fails with "Resource temporarily unavailable" if the
+    read-write image is still attached, and detach does not always take
+    effect by the time it returns -- so this retries and then confirms the
+    mount point is really gone.
+    """
+    target = device or f"/Volumes/{volume}"
+    for attempt in range(6):
+        subprocess.run(["hdiutil", "detach", target, "-force"],
+                       capture_output=True, text=True)
+        time.sleep(1.5)
+        if not Path(f"/Volumes/{volume}").exists():
+            return True
+    return not Path(f"/Volumes/{volume}").exists()
+
+
+def _pretty_dmg(staging: Path, tmp_dmg: Path, dmg: Path, volume: str) -> bool:
+    """Build a disk image with the icons arranged.  False if that cannot be done.
+
+    Needs a usable Finder, so it works on a desktop Mac and generally not on
+    a CI runner, where the caller falls back to a plain image.
+    """
+    device = None
+    try:
+        run(["hdiutil", "create", "-volname", volume, "-srcfolder",
+             str(staging), "-ov", "-fs", "HFS+", "-format", "UDRW",
+             str(tmp_dmg)])
+        mount = subprocess.run(
+            ["hdiutil", "attach", str(tmp_dmg), "-readwrite", "-noverify",
+             "-noautoopen"], capture_output=True, text=True)
+        if mount.returncode != 0:
+            return False
+        for line in mount.stdout.splitlines():
+            if line.strip().startswith("/dev/disk"):
+                device = line.split()[0]
+                break
+        _layout_dmg(volume)
+    except Exception as exc:                                      # noqa: BLE001
+        print(f"  ({exc})")
+        _detach(device, volume)
+        return False
+
+    if not _detach(device, volume):
+        print("  the disk image stayed mounted")
+        return False
+
+    for attempt in range(4):
+        r = subprocess.run(["hdiutil", "convert", str(tmp_dmg), "-format",
+                            "UDZO", "-imagekey", "zlib-level=9", "-ov",
+                            "-o", str(dmg)], capture_output=True, text=True)
+        if r.returncode == 0:
+            return True
+        print(f"  convert attempt {attempt + 1} failed: "
+              f"{(r.stderr or r.stdout).strip().splitlines()[-1][:90]}")
+        time.sleep(4)
+    return False
 
 
 def package_linux(app: Path) -> list[Path]:
