@@ -107,13 +107,21 @@ jobs:
     # Either a pushed tag, or a manual run that named a tag.  The runner's
     # own GITHUB_TOKEN creates the tag and the release, which is what makes
     # this work from an environment that cannot push tags itself.
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+    # always(): a platform that could not build -- or could not get a runner
+    # -- must not hold back the installers that did build. The release is
+    # updated in place when a later run adds the missing one.
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
+
+      - name: What was built
+        run: ls -la artifacts/ && du -h artifacts/* | sort -h
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -125,6 +133,7 @@ jobs:
           draft: false
           prerelease: ${{ inputs.prerelease || false }}
           generate_release_notes: true
+          fail_on_unmatched_files: false
           body: |
             Desktop builds of pydock.
 
