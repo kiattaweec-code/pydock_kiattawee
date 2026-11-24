@@ -20,6 +20,10 @@ jobs:
   build:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
+    # Intel macOS is allowed to fail without blocking the release: Apple has
+    # discontinued the architecture and llvmlite no longer publishes an
+    # x86_64 macOS wheel, so pip falls back to building LLVM from source.
+    continue-on-error: ${{ matrix.optional == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +40,7 @@ jobs:
           - os: macos-15-intel
             label: macOS x86_64 (Intel)
             artifact: macos-x86_64
+            optional: true
           - os: ubuntu-24.04
             label: Linux x86_64
             artifact: linux
@@ -114,6 +119,10 @@ jobs:
             | macOS, Apple silicon | `pydock-*-macos-arm64.dmg` |
             | macOS, Intel | `pydock-*-macos-x86_64.dmg` |
             | Linux | `pydock-*-linux-x86_64.tar.gz` |
+
+            Apple silicon Macs use the `arm64` disk image. Intel Macs are
+            not currently built: `llvmlite` has no x86_64 macOS wheel any
+            more, so that build needs a conda-based toolchain.
 
             These builds are **not code-signed**. Windows SmartScreen will
             warn: choose *More info*, then *Run anyway*. macOS Gatekeeper
