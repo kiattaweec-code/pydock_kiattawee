@@ -39,3 +39,49 @@ if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
     except OSError:
         # A read-only home only costs us the cache, not the run.
         os.environ.setdefault("NUMBA_CACHE_DIR", "")
+
+    # A windowed build has no console, so Python sets sys.stdout and
+    # sys.stderr to None.  Any library that inspects them then dies on
+    # attribute access -- uvicorn's log formatter calls sys.stdout.isatty()
+    # and brings the whole app down before the server ever starts.
+    #
+    # Give the interpreter real streams, pointed at a file, so that nothing
+    # has to special-case the windowed case and the output is recoverable
+    # when something goes wrong.
+    if sys.stdout is None or sys.stderr is None:
+        stream = None
+        try:
+            home.mkdir(parents=True, exist_ok=True)
+            stream = open(home / "pydock-console.log", "a", buffering=1,
+                          encoding="utf-8", errors="replace")
+        except OSError:
+            pass
+
+        if stream is None:
+            class _Discard:
+                """Last resort: swallow output but answer the usual questions."""
+
+                def write(self, text):
+                    return len(text)
+
+                def flush(self):
+                    pass
+
+                def isatty(self):
+                    return False
+
+                def writable(self):
+                    return True
+
+                def readable(self):
+                    return False
+
+                def close(self):
+                    pass
+
+            stream = _Discard()
+
+        if sys.stdout is None:
+            sys.stdout = stream
+        if sys.stderr is None:
+            sys.stderr = stream

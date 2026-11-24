@@ -45,11 +45,17 @@ def free_port(preferred: int = 0) -> int:
 
 
 def setup_logging(verbose: bool):
-    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stderr)]
+    handlers: list[logging.Handler] = []
+    # sys.stderr is None in a windowed build unless the runtime hook has
+    # replaced it; StreamHandler(None) would then fail on first use.
+    if sys.stderr is not None:
+        handlers.append(logging.StreamHandler(sys.stderr))
     try:
         handlers.append(logging.FileHandler(paths.log_file(), encoding="utf-8"))
     except OSError:
         pass                                   # a read-only home is survivable
+    if not handlers:
+        handlers.append(logging.NullHandler())
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s  %(levelname)-7s %(name)s  %(message)s",
@@ -74,9 +80,16 @@ class Server:
         # Pin the plain stack: the optional uvloop/httptools/websockets
         # extras buy nothing on a loopback socket and add ~30 MB to the
         # packaged app, so they are excluded from the bundle entirely.
+        #
+        # log_config=None stops uvicorn installing its own logging: its
+        # colourised formatter reads sys.stdout.isatty() at import of the
+        # config, which is fatal in a windowed build where sys.stdout can be
+        # None.  Logging is already set up here, and uvicorn's messages flow
+        # into it through the root logger.
         config = uvicorn.Config(app, host="127.0.0.1", port=self.port,
                                 log_level="warning", access_log=False,
-                                loop="asyncio", http="h11", ws="none")
+                                loop="asyncio", http="h11", ws="none",
+                                log_config=None)
         self._server = uvicorn.Server(config)
         # The app owns the process lifetime, not uvicorn: without this a
         # Ctrl-C handler from uvicorn fights the window event loop.

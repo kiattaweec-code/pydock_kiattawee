@@ -81,6 +81,13 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install innosetup --no-progress -y
 
+      # 0.1.0 shipped an app that died on launch in the windowed build:
+      # no console means sys.stdout is None, and uvicorn's log formatter
+      # calls .isatty() on it. Launching through a pipe hides this, so the
+      # end-to-end check below cannot see it -- this one reproduces it.
+      - name: Windowed-mode regression test
+        run: python packaging/test_windowed.py
+
       - name: Build and package
         env:
           MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}

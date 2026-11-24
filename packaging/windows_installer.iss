@@ -1,13 +1,13 @@
 ; Inno Setup script for pydock.
 ;
-;   iscc /DMyAppVersion=0.1.0 packaging\windows_installer.iss
+;   iscc /DMyAppVersion=0.1.1 packaging\windows_installer.iss
 ;
 ; Installs per-user by default, so no administrator prompt is needed. The app
 ; writes its jobs and kernel cache to %LOCALAPPDATA%\pydock, which this
 ; removes on uninstall only if the user asks.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.0"
+  #define MyAppVersion "0.1.1"
 #endif
 
 #define MyAppName "pydock"

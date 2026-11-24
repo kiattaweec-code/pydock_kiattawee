@@ -183,8 +183,8 @@ if IS_MAC:
         info_plist={
             "CFBundleName": "pydock",
             "CFBundleDisplayName": "pydock",
-            "CFBundleShortVersionString": "0.1.0",
-            "CFBundleVersion": "0.1.0",
+            "CFBundleShortVersionString": "0.1.1",
+            "CFBundleVersion": "0.1.1",
             "NSHighResolutionCapable": True,
             # The app talks only to 127.0.0.1, which still counts as a local
             # network connection on recent macOS.
