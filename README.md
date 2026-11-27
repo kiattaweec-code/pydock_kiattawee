@@ -56,6 +56,42 @@ See [`pydock_web/README.md`](pydock_web/README.md) for the HTTP API.
 | Symmetry-corrected RMSD | yes |
 | Metal coordination term | yes |
 | Ranked SDF output with per-term breakdown | yes |
+| Structure preparation in the browser (split a complex) | yes |
+| Ligand extraction to MOL2 with Sybyl atom types | yes |
+
+## Preparing a structure
+
+A PDB entry is not a receptor. The bound ligand is still in it, and the engine
+keeps every hetero atom it is given, so a ligand left in the file fills the
+pocket it was meant to reveal. Crystallographic hydrogens cause a quieter
+problem: the engine places polar hydrogens itself and only treats hydroxyls as
+rotatable when the file arrives without any, so a protonated receptor silently
+loses that part of the search.
+
+The **Prepare** page does the splitting. Load a complex, click the ligand, and
+it writes the protein without it alongside the ligand as MOL2 and SDF, then
+hands both to the docking page without a download. It also finds the waters,
+buffers, cryoprotectants and metals, and removes them by default -- except
+metals, which are usually part of the site.
+
+One thing is worth understanding. A PDB file records no bond orders and no
+protonation, so they have to come from somewhere:
+
+- **Paste the ligand's SMILES** (from RCSB or PubChem) and the bond orders are
+  transferred onto the crystal coordinates. The result is exactly the compound
+  you name, with its formal charges, and the coordinates are untouched. The
+  SMILES is checked against the residue's heavy-atom count, so the wrong
+  compound is refused rather than quietly accepted.
+- **Leave it empty** and they are worked out from the geometry. This succeeds
+  on small, mostly-saturated ligands and fails on drug-sized ones: for a
+  43-heavy-atom ergoline no net charge gives a valid structure. When it fails
+  the file is still written, with every bond single and a warning saying so --
+  good for placing a box or measuring an RMSD, not for docking.
+
+RDKit cannot write MOL2, so `pydock/mol2.py` does, with Sybyl atom and bond
+types (`C.ar`, `N.am`, `O.co2`, `C.cat`, `S.o2`, `am` bonds, and so on).
+`packaging/test_mol2.py` writes 17 molecules chosen to exercise the awkward
+cases, reads each one back with RDKit and compares.
 
 ## Scoring functions
 

@@ -88,6 +88,9 @@ jobs:
       - name: Windowed-mode regression test
         run: python packaging/test_windowed.py
 
+      - name: MOL2 writer round-trip test
+        run: python packaging/test_mol2.py
+
       - name: Build and package
         env:
           MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}

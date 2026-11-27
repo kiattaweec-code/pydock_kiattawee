@@ -18,6 +18,11 @@ const state = {
   surfaceOn: false,
 };
 
+/* A structure prepared on prepare.html arrives as ?prep=<id>: its receptor
+ * and extracted ligand are already on the server, so the receptor file
+ * input is not needed and the ligand defines the site. */
+const prepared = { id: null, ligand: null };
+
 Object.assign(state, {
   prep: null,                 // the /api/prepare response for the loaded receptor
   siteViewer: null,
@@ -330,7 +335,58 @@ for (const name of ['centre_x', 'centre_y', 'centre_z', 'size_x', 'size_y', 'siz
   }
 }
 
-$('form').elements.receptor.addEventListener('change', prepareReceptor);
+/* ------------------------------------------- arriving from prepare --- */
+function putFile(name, file) {
+  const input = $('form').elements[name];
+  if (!input) return;
+  const bag = new DataTransfer();
+  bag.items.add(file);
+  input.files = bag.files;
+}
+
+async function adoptPrepared(id) {
+  const grab = async (file, as, type) => {
+    const r = await api(`/api/prep/${id}/${file}`);
+    if (!r.ok) return null;
+    return new File([await r.blob()], as, { type });
+  };
+  const receptor = await grab('receptor.pdb', 'receptor_prepared.pdb', 'chemical/x-pdb');
+  if (!receptor) {
+    showErr('That prepared structure has expired. Prepare it again.');
+    return;
+  }
+  prepared.id = id;
+  putFile('receptor', receptor);
+  $('form').elements.receptor.required = false;
+
+  const ligand = await grab('ligand.sdf', 'ligand_prepared.sdf', 'chemical/x-mdl-sdfile');
+  prepared.ligand = ligand;
+  if (ligand) {
+    // The crystal ligand is the sharpest definition of the site there is,
+    // and it gives an RMSD to judge a redock by.
+    putFile('reference', ligand);
+    $('form').elements.ligands.required = false;
+  }
+
+  const name = new URLSearchParams(location.search).get('ligand');
+  $('preparedNote').innerHTML =
+    '<b>Prepared structure loaded.</b> The receptor has had its ligand '
+    + 'removed' + (ligand ? `, and ${name || 'the extracted ligand'} is the `
+    + 'reference that defines the site' : '') + '. '
+    + '<a href="prepare.html">Prepare another</a>';
+  $('preparedCard').classList.remove('hidden');
+  $('prepRedock').parentElement.classList.toggle('hidden', !ligand);
+
+  await prepareReceptor();
+}
+
+$('form').elements.receptor.addEventListener('change', () => {
+  // Their own file wins: the server-side copy must not override it.
+  prepared.id = null;
+  $('preparedCard').classList.add('hidden');
+  $('form').elements.ligands.required = true;
+  prepareReceptor();
+});
 $('form').elements.reference.addEventListener('change', () => {
   if (fileOf('receptor')) prepareReceptor();
 });
@@ -382,6 +438,14 @@ $('form').addEventListener('submit', async (e) => {
   for (const key of ['detect_cavity', 'rotate_receptor_oh', 'keep_waters']) {
     fd.set(key, $('form').elements[key].checked ? 'true' : 'false');
   }
+  if (prepared.id) {
+    // The receptor and the reference ligand are already on the server; the
+    // empty file input would otherwise overwrite them with nothing.
+    fd.delete('receptor');
+    fd.set('prep_id', prepared.id);
+    fd.set('dock_prepared_ligand',
+           $('prepRedock') && $('prepRedock').checked ? 'true' : 'false');
+  }
   await send('/api/jobs', fd);
 });
 
@@ -393,6 +457,9 @@ $('form').addEventListener('invalid', (e) => {
   const name = (el.name || 'this field').replace(/_/g, ' ');
   showErr(`${where} ${name}: ${el.validationMessage}`);
 }, true);
+
+const fromPrepare = new URLSearchParams(location.search).get('prep');
+if (fromPrepare) { adoptPrepared(fromPrepare); }
 
 $('example').addEventListener('click', runExample);
 $('example2').addEventListener('click', runExample);

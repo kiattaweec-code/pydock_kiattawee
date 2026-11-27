@@ -8,8 +8,8 @@
 import { readFileSync } from 'node:fs';
 import { JSDOM, VirtualConsole } from 'jsdom';
 
-const BASE = 'http://127.0.0.1:8000';
-const root = '/home/claude/pydock_web/static';
+const BASE = process.argv[2] || 'http://127.0.0.1:8079';
+const root = process.argv[3] || '/home/claude/pydock_kiattawee/pydock_web/static';
 const pass = [], fail = [];
 const check = (ok, label, extra = '') =>
   (ok ? pass : fail).push(label + (extra ? `  (${extra})` : ''));

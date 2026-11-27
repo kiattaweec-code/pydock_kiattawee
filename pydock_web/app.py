@@ -31,6 +31,7 @@ from pydock import ligand as ligmod
 from pydock import receptor as recmod
 from pydock.dock import ligand_efficiency, resolve_site
 
+from . import prep as prepmod
 from .jobs import JobManager, Status
 
 HERE = Path(__file__).resolve().parent
@@ -173,6 +174,9 @@ def _safe(name: str) -> str:
 
 
 manager = JobManager(DATA_ROOT, run_job)
+
+prepmod.configure(DATA_ROOT)
+app.include_router(prepmod.router)
 
 
 # --------------------------------------------------------------------------- #
@@ -325,9 +329,11 @@ def prepare(receptor: UploadFile = File(...),
 
 @app.post("/api/jobs")
 def submit(
-    receptor: UploadFile = File(...),
-    ligands: list[UploadFile] = File(...),
+    receptor: UploadFile | None = File(None),
+    ligands: list[UploadFile] = File([]),
     reference: UploadFile | None = File(None),
+    prep_id: str = Form(""),
+    dock_prepared_ligand: str = Form("false"),
     scoring: str = Form("empirical"),
     n_runs: str = Form("10"),
     n_poses: str = Form("5"),
@@ -352,8 +358,24 @@ def submit(
     if scoring not in SCORING:
         raise HTTPException(400, f"unknown scoring function: {scoring}")
     ligands = [f for f in ligands if f and f.filename]
-    if not ligands:
-        raise HTTPException(400, "at least one ligand file is required")
+    prep_id = prep_id.strip()
+
+    # A structure prepared on the preparation page supplies the receptor, and
+    # its extracted ligand marks the binding site -- so neither has to make
+    # the round trip through the user's downloads folder.
+    prep_receptor = prep_ligand = None
+    if prep_id:
+        prep_receptor, prep_ligand = prepmod.prepared_inputs(prep_id)
+    elif receptor is None or not receptor.filename:
+        raise HTTPException(400, "a receptor file is required")
+
+    dock_prepared = (prep_ligand is not None
+                     and dock_prepared_ligand.lower() in ("1", "true", "yes", "on"))
+    if not ligands and not dock_prepared:
+        raise HTTPException(
+            400, "at least one ligand file is required"
+            + (" (or tick the box to redock the prepared ligand)"
+               if prep_ligand is not None else ""))
     if len(ligands) > MAX_LIGANDS:
         raise HTTPException(400, f"at most {MAX_LIGANDS} ligand files per job")
 
@@ -404,10 +426,28 @@ def submit(
 
     job = manager.create(params, "pending", [])
     try:
-        job.receptor_name = _store(receptor, job.workdir, RECEPTOR_EXT)
+        if prep_receptor is not None:
+            job.receptor_name = "receptor_prepared.pdb"
+            (job.workdir / job.receptor_name).write_bytes(
+                prep_receptor.read_bytes())
+        else:
+            job.receptor_name = _store(receptor, job.workdir, RECEPTOR_EXT)
+
         job.ligand_names = [_store(f, job.workdir, LIGAND_EXT) for f in ligands]
+        if dock_prepared:
+            (job.workdir / "prepared_ligand.sdf").write_bytes(
+                prep_ligand.read_bytes())
+            job.ligand_names.append("prepared_ligand.sdf")
+
         if reference is not None and reference.filename:
             params["reference_name"] = _store(reference, job.workdir, LIGAND_EXT)
+        elif prep_ligand is not None:
+            # The ligand that came out of the crystal structure is the best
+            # possible definition of the site, and it gives an RMSD to
+            # measure a redock against.
+            params["reference_name"] = "reference_prepared.sdf"
+            (job.workdir / "reference_prepared.sdf").write_bytes(
+                prep_ligand.read_bytes())
     except HTTPException:
         manager.delete(job.id)
         raise

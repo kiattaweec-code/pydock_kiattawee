@@ -1,0 +1,128 @@
+/* Only what the preparation page adds; everything else is style.css. */
+
+.nav { display: flex; gap: 4px; font-size: 12.5px; }
+.nav a {
+  color: var(--ink-dim); text-decoration: none;
+  padding: 5px 11px; border-radius: var(--r);
+  border: 1px solid transparent;
+}
+.nav a:hover { color: var(--ink); background: var(--panel-2); }
+.nav a.here {
+  color: var(--teal); border-color: var(--line);
+  background: var(--panel-2);
+}
+
+/* ------------------------------------------------------- ligand picks -- */
+.picks { list-style: none; margin: 0; padding: 0; }
+.picks li { margin-bottom: 5px; }
+.picks button {
+  width: 100%; text-align: left; cursor: pointer;
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 7px 9px;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  font-family: var(--sans); font-size: 12.5px;
+}
+.picks button:hover { border-color: var(--teal-dim); }
+.picks button[aria-pressed="true"] {
+  border-color: var(--teal);
+  box-shadow: inset 0 0 0 1px var(--teal-dim);
+}
+.picks .name { font-family: var(--mono); color: var(--ink); }
+.picks .meta {
+  margin-left: auto; font-family: var(--mono);
+  font-size: 11px; color: var(--ink-faint);
+}
+.picks button[aria-pressed="true"] .name { color: var(--teal); }
+
+/* --------------------------------------------------------- the rest ---- */
+.check { display: flex; align-items: center; gap: 8px; margin: 7px 0; font-size: 12.5px; }
+.check input { accent-color: var(--teal); }
+.check em { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); font-style: normal; }
+.hint.indent { margin: -2px 0 10px 22px; }
+
+#smiles {
+  width: 100%; box-sizing: border-box; margin: 2px 0 6px;
+  padding: 7px 9px;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  font-family: var(--mono); font-size: 12px;
+}
+#smiles:focus { outline: none; border-color: var(--teal-dim); }
+
+.files { display: flex; flex-direction: column; gap: 5px; margin: 8px 0 12px; }
+.files a {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 7px 9px; text-decoration: none;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  font-size: 12.5px;
+}
+.files a:hover { border-color: var(--teal-dim); color: var(--teal); }
+.files a .what { font-family: var(--mono); }
+.files a .size { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+
+.placeholder {
+  position: absolute; inset: 0; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-faint); font-size: 13px; pointer-events: none;
+}
+
+/* On the docking page the viewer is one card among several and the legend
+   floats inside it; here the viewer is the whole point, so it fills the
+   column and the legend sits under it as a normal bar. Both properties have
+   to be reset, or the absolute positioning from style.css survives and the
+   legend lands on top of the sidebar. */
+#viewer {
+  height: calc(100vh - 168px);
+  min-height: 420px;
+  position: relative;
+}
+@media (max-width: 950px) { #viewer { height: 60vh; } }
+
+.legend {
+  position: static; pointer-events: auto; text-shadow: none;
+  font-family: var(--sans);
+  display: flex; flex-wrap: wrap; gap: 14px;
+  padding: 8px 12px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--ink-faint);
+}
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend i {
+  width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+  margin-right: 0; vertical-align: baseline;
+}
+
+.warn {
+  margin: 8px 0 0; padding: 8px 10px;
+  border: 1px solid var(--line); border-left: 2px solid var(--amber);
+  border-radius: var(--r);
+  background: var(--panel-2);
+  font-size: 12px; color: var(--ink-dim);
+}
+.warn.good { border-left-color: var(--green); }
+
+/* The browser's default link blue is close to unreadable on this
+   background, and these links sit inside explanatory text. */
+.hint a, .warn a, .intro a {
+  color: var(--teal); text-decoration: none;
+  border-bottom: 1px solid var(--teal-dim);
+}
+.hint a:hover, .warn a:hover, .intro a:hover { border-bottom-color: var(--teal); }
+
+/* The handoff is an anchor so it can be opened in a new tab, but it should
+   look like the primary button it sits in place of. */
+a.primary {
+  flex: 1; text-align: center; text-decoration: none;
+  border-radius: 5px; padding: 8px 14px;
+  background: var(--teal); border: 1px solid var(--teal);
+  color: #07231f; font-weight: 600; font: inherit;
+}
+a.primary { font-weight: 600; }
+a.primary:hover { background: #5adbd0; }
+
+/* Keep the structure on screen while the long panel is scrolled. */
+@media (min-width: 951px) {
+  .layout > .setup { max-height: calc(100vh - 100px); overflow-y: auto; }
+  .layout > .main { position: sticky; top: 16px; }
+}

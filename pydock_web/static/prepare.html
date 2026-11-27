@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pydock &middot; prepare a structure</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="prepare.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <h1>pydock</h1>
+    <span class="tag">prepare a structure</span>
+  </div>
+  <nav class="nav">
+    <a href="prepare.html" class="here">Prepare</a>
+    <a href="index.html">Dock</a>
+  </nav>
+</header>
+
+<main class="layout">
+
+  <!-- ------------------------------------------------ controls -------- -->
+  <aside class="panel setup">
+
+    <section>
+      <h2>1 &middot; Load a complex</h2>
+      <p class="intro">
+        A structure straight from the PDB is not a receptor: the bound ligand
+        is still in it, and pydock would treat it as part of the protein.
+      </p>
+      <label class="file">
+        <span class="lab">Structure <em>.pdb</em></span>
+        <input type="file" id="file" accept=".pdb,.ent">
+      </label>
+      <div class="status" id="loadStatus"></div>
+    </section>
+
+    <section id="pickSection" class="hidden">
+      <h2>2 &middot; Choose the ligand</h2>
+      <p class="hint">
+        Click a molecule in the list, or click it in the viewer.
+      </p>
+      <ul class="picks" id="picks"></ul>
+      <div class="hint" id="noLigand"></div>
+    </section>
+
+    <section id="smilesSection" class="hidden">
+      <h2>3 &middot; Confirm the chemistry</h2>
+      <p class="hint">
+        A PDB file records no bond orders. Paste the ligand's SMILES and they
+        are taken from it, so the MOL2 is exactly the compound you name.
+        Leave it empty and pydock works them out from the geometry, which
+        fails on larger ligands.
+      </p>
+      <label class="lab" for="smiles">SMILES <em>recommended</em></label>
+      <input type="text" id="smiles" placeholder="CC(=O)Oc1ccccc1C(=O)O"
+             spellcheck="false" autocomplete="off">
+      <div class="hint" id="smilesHint"></div>
+    </section>
+
+    <section id="optionSection" class="hidden">
+      <h2>4 &middot; Clean up</h2>
+      <label class="check">
+        <input type="checkbox" id="optH" checked>
+        <span>Remove hydrogens <em id="hCount"></em></span>
+      </label>
+      <p class="hint indent">
+        Recommended. pydock adds polar hydrogens itself, and it only rotates
+        hydroxyls when the file arrives without any.
+      </p>
+      <label class="check">
+        <input type="checkbox" id="optWater" checked>
+        <span>Remove waters <em id="wCount"></em></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optBuffer" checked>
+        <span>Remove buffers and cryoprotectants <em id="bCount"></em></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optMetal" checked>
+        <span>Keep metal ions <em id="mCount"></em></span>
+      </label>
+      <p class="hint indent">
+        Structural metals are usually part of the site and are scored.
+      </p>
+
+      <div class="actions">
+        <button type="button" id="build" class="primary">Prepare</button>
+      </div>
+      <div class="status" id="buildStatus"></div>
+    </section>
+
+    <section id="resultSection" class="hidden">
+      <h2>5 &middot; Results</h2>
+      <dl class="summary" id="summary"></dl>
+      <div class="files" id="files"></div>
+      <div class="actions">
+        <a id="toDock" class="primary" href="index.html">Send to docking</a>
+      </div>
+      <p class="hint">
+        The prepared receptor and ligand stay on the server, so docking picks
+        them up without a download.
+      </p>
+    </section>
+
+  </aside>
+
+  <!-- ------------------------------------------------ viewer ---------- -->
+  <section class="panel main">
+    <div class="view">
+      <div class="viewer" id="viewer">
+        <p class="placeholder" id="placeholder">
+          Load a .pdb file to see it here.
+        </p>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+</main>
+
+<script src="vendor/3Dmol-min.js"></script>
+<script>
+  if (!window.$3Dmol) {
+    document.write('<script src="https://3Dmol.org/build/3Dmol-min.js"><\/script>');
+  }
+</script>
+<script src="prepare.js"></script>
+</body>
+</html>

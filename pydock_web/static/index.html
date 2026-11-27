@@ -6,6 +6,7 @@
 <title>pydock</title>
 <link rel="icon" href="favicon.ico">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="prepare.css">
 </head>
 <body>
 
@@ -15,6 +16,10 @@
     <h1>pydock</h1>
     <span class="tag">flexible-ligand docking</span>
   </div>
+  <nav class="nav">
+    <a href="prepare.html">Prepare</a>
+    <a href="index.html" class="here">Dock</a>
+  </nav>
   <div class="env" id="env">checking engine&hellip;</div>
 </header>
 
@@ -24,8 +29,21 @@
   <aside class="panel setup">
     <form id="form" autocomplete="off">
 
+      <section id="preparedCard" class="hidden">
+        <div class="warn good" id="preparedNote"></div>
+        <label class="check">
+          <input type="checkbox" id="prepRedock">
+          <span>Also redock the extracted ligand
+            <em>checks the setup</em></span>
+        </label>
+      </section>
+
       <section>
         <h2>Structures</h2>
+        <p class="hint">
+          Straight from the PDB? <a href="prepare.html">Prepare it first</a> —
+          the bound ligand has to come out, or it fills the pocket.
+        </p>
         <label class="file">
           <span class="lab">Receptor <em>.pdb</em></span>
           <input type="file" name="receptor" accept=".pdb,.ent" required>
