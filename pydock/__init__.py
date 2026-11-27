@@ -19,7 +19,7 @@ from .ligand import Ligand, load_ligand, prepare_ligand
 from .receptor import Receptor, prepare_receptor, site_from_ligand, site_from_residues
 from .scoring import Scorer, build_scorer
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __all__ = [
     "DockingConfig", "LigandResult", "run_docking", "write_poses",
     "Docker", "GAConfig", "Solution", "cluster_solutions",
