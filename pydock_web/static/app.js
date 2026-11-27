@@ -613,6 +613,46 @@ function renderTabs(job) {
   }
 }
 
+/* Saving where they want it, rather than wherever downloads land. The
+ * server is on their own machine, so it can write the folder directly. */
+let nativeSave = { folder_picker: false, default_folder: '' };
+fetch('/api/prep/native').then((r) => r.json())
+  .then((info) => { nativeSave = info; })
+  .catch(() => { /* downloads still work */ });
+
+$('saveJob').addEventListener('click', async () => {
+  if (!state.jobId) return;
+  const button = $('saveJob');
+  const was = button.textContent;
+  button.disabled = true;
+  button.textContent = 'saving…';
+  try {
+    const fd = new FormData();
+    if (nativeSave.folder_picker) fd.append('browse', 'true');
+    else {
+      const asked = prompt('Folder on this computer:',
+                           nativeSave.default_folder || '');
+      if (!asked) { button.textContent = was; button.disabled = false; return; }
+      fd.append('folder', asked);
+    }
+    const r = await api(`/api/jobs/${state.jobId}/save`, { method: 'POST', body: fd });
+    const out = await r.json();
+    if (!r.ok) throw new Error(out.detail || r.statusText);
+    if (out.cancelled) { button.textContent = was; return; }
+    button.textContent = `Saved ${out.files.length} files`;
+    // The path is the useful part: without it they have to go looking.
+    $('summary').textContent =
+      `Saved to ${out.folder}` + (out.renamed
+        ? ' (numbered, so nothing there was replaced)' : '');
+  } catch (err) {
+    showErr(String(err.message || err));
+    button.textContent = was;
+  } finally {
+    button.disabled = false;
+    setTimeout(() => { button.textContent = was; }, 6000);
+  }
+});
+
 /* The pose on its own is only half of what people need: looking at it, or
  * sending it to anyone, means having the protein with it. */
 function updateSaveLinks(index) {

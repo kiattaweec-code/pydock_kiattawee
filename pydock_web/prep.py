@@ -18,11 +18,13 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from rdkit import Chem
 
 from pydock import mol2 as mol2mod
 from pydock import structure as structmod
+
+from . import native as nativemod
 
 router = APIRouter(prefix="/api/prep", tags=["prepare"])
 
@@ -251,6 +253,10 @@ FILES = {
 
 @router.get("/{prep_id}/{filename}")
 def download(prep_id: str, filename: str):
+    # This route is declared before the archive one and would otherwise
+    # match it first, turning the zip into a 404.
+    if filename == "bundle.zip":
+        return bundle(prep_id)
     if filename not in FILES:
         raise HTTPException(404, "no such file")
     wd = _dir(prep_id)
@@ -269,3 +275,79 @@ def prepared_inputs(prep_id: str) -> tuple[Path, Path | None]:
         raise HTTPException(400, "that structure has not been prepared yet")
     ligand = wd / "ligand.sdf"
     return receptor, (ligand if ligand.is_file() else None)
+
+
+# --------------------------------------------------------------------------- #
+# Saving onto the person's own machine
+# --------------------------------------------------------------------------- #
+def _stem(wd: Path) -> str:
+    """A readable prefix for saved files, from the uploaded file's name."""
+    try:
+        meta = json.loads((wd / "meta.json").read_text())
+        stem = Path(meta.get("name", "structure")).stem
+    except Exception:                                             # noqa: BLE001
+        stem = "structure"
+    safe = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in stem)
+    return safe[:40] or "structure"
+
+
+def _outputs(wd: Path) -> list[tuple[Path, str]]:
+    stem = _stem(wd)
+    return [(wd / "receptor.pdb", f"{stem}_receptor.pdb"),
+            (wd / "ligand.mol2", f"{stem}_ligand.mol2"),
+            (wd / "ligand.sdf", f"{stem}_ligand.sdf")]
+
+
+@router.get("/native")
+def native_info():
+    """Whether a folder can be chosen with a dialog, and where files go."""
+    return JSONResponse({"folder_picker": nativemod.has_folder_picker(),
+                         "default_folder": str(nativemod.default_folder())})
+
+
+@router.post("/{prep_id}/save")
+def save_to_disk(prep_id: str, folder: str = Form(""), browse: str = Form("")):
+    """Write the prepared files into a folder on this machine.
+
+    The server is bound to the loopback address, so the only thing that can
+    reach this is something already running on the person's own computer.
+    """
+    wd = _dir(prep_id)
+    if not (wd / "receptor.pdb").is_file():
+        raise HTTPException(400, "prepare the structure first")
+
+    if _flag(browse) and nativemod.has_folder_picker():
+        chosen = nativemod.pick_folder()
+        if not chosen:
+            return JSONResponse({"cancelled": True})
+        folder = chosen
+
+    try:
+        target = nativemod.resolve_folder(folder)
+        written = nativemod.copy_into(target, _outputs(wd))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    return JSONResponse({"folder": str(target), "files": written,
+                         "renamed": any(f["renamed"] for f in written)})
+
+
+@router.get("/{prep_id}/bundle.zip")
+def bundle(prep_id: str):
+    """All the prepared files in one archive, for saving through a browser."""
+    import io
+    import zipfile
+
+    wd = _dir(prep_id)
+    if not (wd / "receptor.pdb").is_file():
+        raise HTTPException(400, "prepare the structure first")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for source, name in _outputs(wd):
+            if source.is_file():
+                z.write(source, name)
+    buf.seek(0)
+    return Response(buf.read(), media_type="application/zip",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="{_stem(wd)}_prepared.zip"'})

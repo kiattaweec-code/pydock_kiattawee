@@ -236,6 +236,23 @@ Docking never moves the receptor, so the two do line up -- the merge just
 saves you keeping the pair together by hand. In PyMOL the ligand is
 `chain Z and resn LIG`.
 
+## Saving to your own computer
+
+Downloads land wherever the browser puts them, one file at a time. Because
+the app runs on your machine and is bound to the loopback address, it can
+write files straight into a folder you choose instead:
+
+- On the preparation page, **Save a copy on this computer** writes the
+  receptor, the ligand MOL2 and the ligand SDF into one folder, named after
+  the structure you loaded.
+- On the results panel, **Save to computer** writes the receptor, every
+  ligand's poses, a merged complex for each top pose, and the ranking.
+
+In the installed app this opens a real folder dialog. In a browser tab there
+is no dialog, so you type or paste the folder, and a ZIP is offered as well.
+Nothing is ever overwritten: a second save of the same structure is numbered
+`..._2`, so a file you already have open stays as it is.
+
 ## Output
 
 One SDF per ligand, poses ranked best first, each tagged with the total score,

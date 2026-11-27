@@ -99,6 +99,20 @@
       <h2>5 &middot; Results</h2>
       <dl class="summary" id="summary"></dl>
       <div class="files" id="files"></div>
+
+      <div class="saveRow" id="saveRow">
+        <label class="lab" for="saveFolder">Save a copy on this computer</label>
+        <div class="saveLine">
+          <input type="text" id="saveFolder" spellcheck="false"
+                 autocomplete="off" placeholder="folder on this computer">
+          <button type="button" id="saveBtn">Save</button>
+        </div>
+        <div class="status" id="saveStatus"></div>
+        <p class="hint">
+          Or <a id="dlZip" href="#" download>download all three as a ZIP</a>.
+        </p>
+      </div>
+
       <div class="actions">
         <a id="toDock" class="primary" href="index.html">Send to docking</a>
       </div>

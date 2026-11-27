@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -31,6 +32,8 @@ from pydock import cavity as cavmod
 from pydock import ligand as ligmod
 from pydock import receptor as recmod
 from pydock import structure as structmod
+
+from . import native as nativemod
 from pydock.dock import ligand_efficiency, resolve_site
 
 from . import prep as prepmod
@@ -765,6 +768,63 @@ def _bundle_readme(job, has_reference: bool, has_ranking: bool) -> str:
         f"\n"
         f"Scores are from published parameters, not refitted here: use them\n"
         f"to rank, not as binding affinities.\n")
+
+
+@app.post("/api/jobs/{jid}/save")
+def save_job(jid: str, folder: str = Form(""), browse: str = Form("")):
+    """Write this run's files into a folder on this machine.
+
+    The same reasoning as the preparation page: the server is on the
+    person's own computer, so it can put results where they want them
+    instead of wherever the browser drops downloads.
+    """
+    job = manager.get(jid)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    if not job.results:
+        raise HTTPException(400, "this job has no results yet")
+
+    if browse.lower() in ("1", "true", "yes", "on") \
+            and nativemod.has_folder_picker():
+        chosen = nativemod.pick_folder()
+        if not chosen:
+            return JSONResponse({"cancelled": True})
+        folder = chosen
+
+    receptor = _receptor_path(job)
+    pairs: list[tuple[Path, str]] = [(receptor, f"{job.id}_receptor.pdb")]
+    tmp = job.workdir / "_save"
+    tmp.mkdir(exist_ok=True)
+    for i, result in enumerate(job.results):
+        name = result.get("sdf")
+        path = job.workdir / "poses" / (name or "")
+        if not name or not path.exists():
+            continue
+        lig = _safe(result.get("name") or f"ligand{i + 1}")
+        pairs.append((path, f"{lig}_poses.sdf"))
+        try:
+            mol, _ = _pose(job, i, 1)
+            staged = tmp / f"{lig}_pose1_complex.pdb"
+            staged.write_text(structmod.merge_complex(
+                receptor.read_text(errors="replace"), mol,
+                title=f"{lig} pose 1, job {job.id}"))
+            pairs.append((staged, staged.name))
+        except Exception:                                         # noqa: BLE001
+            pass                         # one bad pose must not lose the rest
+    ranking = job.workdir / "poses" / "ranking.csv"
+    if ranking.exists():
+        pairs.append((ranking, f"{job.id}_ranking.csv"))
+
+    try:
+        target = nativemod.resolve_folder(folder)
+        written = nativemod.copy_into(target, pairs)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    return JSONResponse({"folder": str(target), "files": written,
+                         "renamed": any(f["renamed"] for f in written)})
 
 
 app.mount("/", StaticFiles(directory=str(STATIC), html=True), name="static")

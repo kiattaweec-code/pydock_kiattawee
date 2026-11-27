@@ -129,3 +129,18 @@ a.primary:hover { background: #5adbd0; }
 
 .siteWarnings { padding: 12px 14px 2px; }
 .siteWarnings .warn { margin: 0 0 10px; border-left-color: var(--amber); }
+
+.saveRow { margin: 14px 0 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.saveLine { display: flex; gap: 6px; margin: 4px 0 6px; }
+.saveLine input {
+  flex: 1; min-width: 0; padding: 7px 9px;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  font-family: var(--mono); font-size: 11.5px;
+}
+.saveLine input:focus { outline: none; border-color: var(--teal-dim); }
+.saveLine button { white-space: nowrap; }
+.savedPath {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  word-break: break-all;
+}

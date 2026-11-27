@@ -10,6 +10,7 @@
 const $ = (id) => document.getElementById(id);
 
 const state = {
+  native: { folder_picker: false, default_folder: '' },
   prepId: null,
   meta: null,
   selected: null,
@@ -25,6 +26,22 @@ const COLOURS = {
   buffer: '0x6b7889',
   water: '0x3a4656',
 };
+
+/* The app runs on the person's own machine, so it can write where they
+ * ask. In its own window there is a real folder dialog; in a browser tab
+ * there is not, and a typed path plus a ZIP is the next best thing. */
+fetch('/api/prep/native').then((r) => r.json()).then((info) => {
+  state.native = info;
+  const box = $('saveFolder');
+  if (info.folder_picker) {
+    box.value = '';
+    box.placeholder = 'choose a folder\u2026';
+    box.readOnly = true;
+    $('saveBtn').textContent = 'Choose folder\u2026';
+  } else if (info.default_folder) {
+    box.value = info.default_folder;
+  }
+}).catch(() => { /* saving is simply unavailable; downloads still work */ });
 
 /* ------------------------------------------------------------- helpers -- */
 function status(el, text, kind) {
@@ -289,9 +306,41 @@ function showResult(out) {
   if (out.ligand) params.set('ligand', out.ligand.label);
   $('toDock').href = 'index.html?' + params.toString();
 
+  $('dlZip').href = `/api/prep/${state.prepId}/bundle.zip`;
+  status('saveStatus', '');
+
   $('resultSection').classList.remove('hidden');
   // The panel is long enough that the results land below the fold, which
   // reads as nothing having happened.
   $('resultSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+
+/* ------------------------------------------------------------- saving --- */
+$('saveBtn').addEventListener('click', async () => {
+  if (!state.prepId || !state.built) return;
+  const button = $('saveBtn');
+  button.disabled = true;
+  status('saveStatus', 'saving…');
+
+  const form = new FormData();
+  if (state.native.folder_picker) form.append('browse', 'true');
+  form.append('folder', $('saveFolder').value.trim());
+
+  try {
+    const out = await post(`/api/prep/${state.prepId}/save`, form);
+    if (out.cancelled) { status('saveStatus', ''); return; }
+    $('saveFolder').value = out.folder;
+    const names = out.files.map((f) => f.name).join(', ');
+    status('saveStatus',
+      `${out.files.length} files saved` + (out.renamed
+        ? ' — numbered, so nothing already there was replaced' : ''),
+      'good');
+    $('saveStatus').insertAdjacentHTML('beforeend',
+      `<div class="savedPath">${out.folder}<br>${names}</div>`);
+  } catch (err) {
+    status('saveStatus', String(err.message || err), 'err');
+  } finally {
+    button.disabled = false;
+  }
+});

@@ -11,6 +11,14 @@ import { JSDOM, VirtualConsole } from 'jsdom';
 const BASE = process.argv[2] || 'http://127.0.0.1:8079';
 const root = process.argv[3] || '/home/claude/pydock_kiattawee/pydock_web/static';
 const pass = [], fail = [];
+async function waitForSoft(test, ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    if (test()) return true;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return false;
+}
 const check = (ok, label, extra = '') =>
   (ok ? pass : fail).push(label + (extra ? `  (${extra})` : ''));
 
@@ -158,6 +166,25 @@ if (started) {
       check(r.ok && body.byteLength > 0, `${id} actually downloads`,
             `http ${r.status}, ${body.byteLength} bytes`);
     }
+
+    // Saving onto this machine, which is the point of a desktop app.
+    check(!!$('saveJob'), 'the save-to-computer button exists');
+    window.prompt = () => '/tmp/jsdom_jobsave';
+    $('saveJob').dispatchEvent(new window.Event('click'));
+    const savedJob = await waitForSoft(
+      () => /^Saved \d+ files/.test($('saveJob').textContent), 30000);
+    check(savedJob, 'the button reports the files as saved',
+          $('saveJob').textContent);
+    check(/Saved to \/tmp\/jsdom_jobsave/.test($('summary').textContent),
+          'and the folder is shown', $('summary').textContent);
+    const { existsSync, readdirSync } = await import('node:fs');
+    const files = existsSync('/tmp/jsdom_jobsave')
+      ? readdirSync('/tmp/jsdom_jobsave') : [];
+    check(files.some((f) => f.endsWith('_complex.pdb'))
+          && files.some((f) => f.endsWith('_poses.sdf'))
+          && files.some((f) => f.endsWith('_receptor.pdb')),
+          'the complex, the poses and the protein are all on disk',
+          files.join(', '));
 
     // The complex must carry both halves, or it is just a renamed protein.
     const cx = await (await fetch(

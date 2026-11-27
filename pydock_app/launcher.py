@@ -134,8 +134,24 @@ def show_window(url: str) -> bool:
     except Exception:                                         # noqa: BLE001
         return False
     try:
-        webview.create_window(WINDOW_TITLE, url, width=1480, height=980,
-                              min_size=(900, 640), text_select=True)
+        window = webview.create_window(WINDOW_TITLE, url, width=1480, height=980,
+                                       min_size=(900, 640), text_select=True)
+
+        # With a real window there is a real folder dialog, so "save these
+        # files on my computer" can mean the folder they actually want
+        # rather than wherever downloads happen to land.
+        def choose_folder():
+            picked = window.create_file_dialog(webview.FOLDER_DIALOG)
+            if not picked:
+                return None
+            return picked[0] if isinstance(picked, (list, tuple)) else picked
+
+        try:
+            from pydock_web import native                        # noqa: PLC0415
+            native.set_folder_picker(choose_folder)
+        except Exception:                                        # noqa: BLE001
+            log.debug("no folder picker registered", exc_info=True)
+
         webview.start()                 # blocks until the window is closed
         return True
     except Exception:                                         # noqa: BLE001

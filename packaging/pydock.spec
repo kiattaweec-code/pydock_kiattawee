@@ -42,7 +42,7 @@ for mod in ("geometry", "grid", "scoring", "cavity", "ga", "params",
 binaries = []
 hiddenimports = [
     "pydock", "pydock_web", "pydock_web.app", "pydock_web.jobs",
-    "pydock_web.prep", "pydock.structure", "pydock.mol2",
+    "pydock_web.prep", "pydock_web.native", "pydock.structure", "pydock.mol2",
     "pydock_app", "pydock_app.launcher", "pydock_app.paths",
     "uvicorn.logging", "uvicorn.loops.asyncio",
     "uvicorn.protocols.http.h11_impl", "uvicorn.lifespan.on",

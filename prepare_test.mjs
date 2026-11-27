@@ -162,6 +162,37 @@ if (loaded) {
       check(r.ok, `${href.split('/').pop()} downloads`, `http ${r.status}`);
     }
 
+    /* ---- saving onto this machine ------------------------------------ */
+    check(!!$('saveBtn') && !!$('saveFolder'), 'the save controls exist');
+    check($('dlZip').getAttribute('href').endsWith('/bundle.zip'),
+          'the ZIP link is set', $('dlZip').getAttribute('href'));
+    const zip = await fetch(BASE + $('dlZip').getAttribute('href'));
+    check(zip.ok && (await zip.arrayBuffer()).byteLength > 1000,
+          'the ZIP downloads');
+
+    const dest = '/tmp/jsdom_save';
+    $('saveFolder').value = dest;
+    $('saveBtn').dispatchEvent(new window.Event('click'));
+    const saved = await settle(() => /saved/.test($('saveStatus').textContent));
+    check(saved, 'the page reports the files as saved', $('saveStatus').textContent);
+    check(/jsdom_save/.test($('saveStatus').innerHTML),
+          'and shows where they went');
+    const { existsSync, readdirSync } = await import('node:fs');
+    const onDisk = existsSync(dest) ? readdirSync(dest) : [];
+    check(onDisk.length === 3, 'three files really are on disk', onDisk.join(', '));
+    check(onDisk.some((f) => f.endsWith('.mol2')) &&
+          onDisk.some((f) => f.endsWith('_receptor.pdb')),
+          'the ligand MOL2 and the receptor are among them', onDisk.join(', '));
+
+    // A second save must not quietly replace the first.
+    $('saveBtn').dispatchEvent(new window.Event('click'));
+    await settle(() => /numbered/.test($('saveStatus').textContent));
+    check(/numbered/.test($('saveStatus').textContent),
+          'saving twice numbers the copies instead of overwriting',
+          $('saveStatus').textContent);
+    check(readdirSync(dest).length === 6, 'so six files are there now',
+          String(readdirSync(dest).length));
+
     const good = doc.querySelector('#resultSection .warn.good');
     check(!!good && /matches the SMILES/.test(good.textContent),
           'the page confirms the ligand matches the SMILES');
