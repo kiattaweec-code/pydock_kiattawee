@@ -21,7 +21,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 DIST = ROOT / "dist"
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 
 IS_WIN = sys.platform == "win32"
 IS_MAC = sys.platform == "darwin"

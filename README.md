@@ -219,6 +219,23 @@ scorer = build_scorer("empirical", rec, lig, centre, half)
 print(scorer.score(lig.coords0, breakdown=True), scorer.terms())
 ```
 
+## Saving results
+
+The results panel offers four downloads:
+
+| Button | What you get |
+|---|---|
+| Poses (SDF) | every kept pose for the selected ligand, best first, with the score and per-term breakdown on each record |
+| Pose + protein (PDB) | the selected pose merged into the receptor as chain `Z`, residue `LIG`, with CONECT records -- opens directly in PyMOL or Chimera |
+| Protein (PDB) | the receptor file that was docked, whole |
+| Everything (ZIP) | the above for every ligand, plus the reference, `ranking.csv` and a README |
+
+The merged complex exists because a pose on its own is half an answer: looking
+at it, or sending it to anyone, means having the protein in the same frame.
+Docking never moves the receptor, so the two do line up -- the merge just
+saves you keeping the pair together by hand. In PyMOL the ligand is
+`chain Z and resn LIG`.
+
 ## Output
 
 One SDF per ligand, poses ranked best first, each tagged with the total score,

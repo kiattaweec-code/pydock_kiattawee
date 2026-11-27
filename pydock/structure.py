@@ -429,3 +429,80 @@ def build_receptor(structure: Structure, drop_keys: set[str] | None = None,
     text = "\n".join(kept) + "\nEND\n"
     return text, {"atoms_kept": len(kept), "dropped": dropped,
                   "kept": kept_kinds}
+
+
+# --------------------------------------------------------------------------- #
+# Putting a pose back with its protein
+# --------------------------------------------------------------------------- #
+def merge_complex(receptor_pdb: str, ligand: Chem.Mol, chain: str = "Z",
+                  resname: str = "LIG", resseq: int = 900,
+                  title: str = "") -> str:
+    """One PDB holding the receptor and a docked pose, ready for PyMOL.
+
+    The pose comes out of docking as an SDF and the protein stays a PDB, so
+    looking at the two together means loading both and hoping they share a
+    frame.  They do -- docking never moves the receptor -- but the pair is
+    awkward to keep together, mail, or attach to a paper.
+
+    The ligand is given its own chain and residue so it can be selected on
+    its own, and its CONECT records are renumbered onto the merged serials;
+    without them a viewer guesses the bonds by distance and draws aromatic
+    rings as whatever the distances suggest.
+    """
+    lines = [ln.rstrip("\n") for ln in receptor_pdb.splitlines()
+             if ln[:6] in ("ATOM  ", "HETATM")]
+    if not lines:
+        raise ValueError("the receptor has no atom records")
+
+    last_serial = 0
+    for ln in lines:
+        try:
+            last_serial = max(last_serial, int(ln[6:11]))
+        except ValueError:
+            pass
+
+    # Residue information decides what the ligand is called on screen.
+    probe = Chem.Mol(ligand)
+    for i, atom in enumerate(probe.GetAtoms(), start=1):
+        info = Chem.AtomPDBResidueInfo()
+        info.SetName(f"{atom.GetSymbol()}{i}".ljust(4)[:4])
+        info.SetResidueName(resname[:3].ljust(3))
+        info.SetResidueNumber(resseq)
+        info.SetChainId(chain[:1])
+        info.SetIsHeteroAtom(True)
+        info.SetOccupancy(1.0)
+        info.SetTempFactor(0.0)
+        atom.SetMonomerInfo(info)
+
+    block = Chem.MolToPDBBlock(probe, flavor=4)   # 4: write CONECT records
+
+    old_to_new: dict[int, int] = {}
+    hetatm: list[str] = []
+    conect: list[str] = []
+    for ln in block.splitlines():
+        if ln[:6] in ("ATOM  ", "HETATM"):
+            old = int(ln[6:11])
+            new = last_serial + len(hetatm) + 1
+            old_to_new[old] = new
+            hetatm.append("HETATM" + f"{new:5d}" + ln[11:].rstrip())
+        elif ln.startswith("CONECT"):
+            conect.append(ln.rstrip())
+
+    remapped = []
+    for ln in conect:
+        serials = [ln[i:i + 5].strip() for i in range(6, len(ln.rstrip()), 5)]
+        new = [old_to_new.get(int(s)) for s in serials if s]
+        new = [n for n in new if n is not None]
+        if len(new) > 1:
+            remapped.append("CONECT" + "".join(f"{n:5d}" for n in new))
+
+    out = []
+    if title:
+        out.append(f"REMARK   1 {title[:60]}")
+    out.append("REMARK   1 receptor and docked pose, merged by pydock")
+    out += lines
+    out.append("TER")
+    out += hetatm
+    out += remapped
+    out.append("END")
+    return "\n".join(out) + "\n"

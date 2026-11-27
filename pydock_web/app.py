@@ -20,7 +20,8 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (FileResponse, JSONResponse, PlainTextResponse,
+                               Response)
 from fastapi.staticfiles import StaticFiles
 
 from rdkit import Chem
@@ -631,6 +632,139 @@ def poses_sdf(jid: str, index: int):
         raise HTTPException(404, "poses have not been written")
     return FileResponse(path, media_type="chemical/x-mdl-sdfile",
                         filename=f"{job.id}_{name}")
+
+
+def _receptor_path(job) -> Path:
+    path = Path(job._payload.get("receptor_path")
+                or (job.workdir / job.receptor_name))
+    if not path.exists():
+        raise HTTPException(404, "the receptor file is gone")
+    return path
+
+
+def _pose(job, index: int, rank: int) -> tuple:
+    """One pose of one ligand, as (molecule, ligand name)."""
+    if index < 0 or index >= len(job.results):
+        raise HTTPException(404, "no such ligand in this job")
+    result = job.results[index]
+    name = result.get("sdf")
+    path = job.workdir / "poses" / (name or "")
+    if not name or not path.exists():
+        raise HTTPException(404, "poses have not been written")
+    mols = [m for m in Chem.SDMolSupplier(str(path), removeHs=False,
+                                          sanitize=False) if m is not None]
+    if not mols:
+        raise HTTPException(404, "that pose file could not be read")
+    if rank < 1 or rank > len(mols):
+        raise HTTPException(404, f"this ligand has {len(mols)} poses")
+    return mols[rank - 1], (result.get("name") or f"ligand{index + 1}")
+
+
+@app.get("/api/jobs/{jid}/receptor_full.pdb")
+def receptor_full(jid: str):
+    """The whole receptor file, not the copy trimmed for the viewer."""
+    job = manager.get(jid)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    return FileResponse(str(_receptor_path(job)), media_type="chemical/x-pdb",
+                        filename=f"{job.id}_receptor.pdb")
+
+
+@app.get("/api/jobs/{jid}/complex/{index}.pdb")
+def complex_pdb(jid: str, index: int, pose: int = 1):
+    """Receptor and one docked pose in a single file.
+
+    Saving the result "with the protein" otherwise means downloading an SDF
+    and a PDB and trusting they still share a frame.
+    """
+    job = manager.get(jid)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    mol, name = _pose(job, index, pose)
+    try:
+        text = structmod.merge_complex(
+            _receptor_path(job).read_text(errors="replace"), mol,
+            title=f"{name} pose {pose}, job {job.id}")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return PlainTextResponse(
+        text, media_type="chemical/x-pdb",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{_safe(name)}_pose{pose}_complex.pdb"'})
+
+
+@app.get("/api/jobs/{jid}/bundle.zip")
+def bundle_zip(jid: str):
+    """Everything from this run in one archive."""
+    import io
+    import zipfile
+
+    job = manager.get(jid)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    if not job.results:
+        raise HTTPException(400, "this job has no results yet")
+
+    receptor = _receptor_path(job)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(receptor, "receptor.pdb")
+        for i, result in enumerate(job.results):
+            name = result.get("sdf")
+            path = job.workdir / "poses" / (name or "")
+            if name and path.exists():
+                z.write(path, f"poses/{name}")
+                try:
+                    mol, lig = _pose(job, i, 1)
+                    z.writestr(
+                        f"complex/{_safe(lig)}_pose1_complex.pdb",
+                        structmod.merge_complex(
+                            receptor.read_text(errors="replace"), mol,
+                            title=f"{lig} pose 1, job {job.id}"))
+                except Exception:                                 # noqa: BLE001
+                    pass                 # one bad pose must not lose the rest
+        ref = job.params.get("reference_name")
+        if ref and (job.workdir / ref).exists():
+            z.write(job.workdir / ref, f"reference/{ref}")
+        ranking = job.workdir / "poses" / "ranking.csv"
+        has_ranking = ranking.exists()  # only written for a multi-ligand run
+        if has_ranking:
+            z.write(ranking, "ranking.csv")
+        z.writestr("README.txt", _bundle_readme(job, bool(ref), has_ranking))
+
+    buf.seek(0)
+    return Response(
+        buf.read(), media_type="application/zip",
+        headers={"Content-Disposition":
+                 f'attachment; filename="pydock_{job.id}.zip"'})
+
+
+def _bundle_readme(job, has_reference: bool, has_ranking: bool) -> str:
+    params = job.params or {}
+    # Only what is actually in the archive: a contents list that names
+    # files that are not there is worse than none.
+    contents = [
+        "receptor.pdb          the receptor file that was docked",
+        "poses/                the docked poses, best first, one file per",
+        "                      ligand; scores are in each record",
+        "complex/              receptor and top pose in one file, for",
+        "                      opening directly in PyMOL or Chimera",
+    ]
+    if has_reference:
+        contents.append("reference/            the reference ligand")
+    if has_ranking:
+        contents.append("ranking.csv           every ligand, best score first")
+    return (
+        f"pydock {__version__} -- results of job {job.id}\n"
+        f"\n"
+        + "\n".join(contents) + "\n"
+        f"\n"
+        f"scoring function: {params.get('scoring', 'unknown')}\n"
+        f"runs: {params.get('n_runs', '?')}   poses kept: "
+        f"{params.get('n_poses', '?')}\n"
+        f"\n"
+        f"Scores are from published parameters, not refitted here: use them\n"
+        f"to rank, not as binding affinities.\n")
 
 
 app.mount("/", StaticFiles(directory=str(STATIC), html=True), name="static")

@@ -124,6 +124,11 @@ if (started) {
       'pose table populated');
     const rows = [...$('poseTable').querySelectorAll('tbody tr')];
     check(rows.length > 0, 'pose rows rendered', `${rows.length} rows`);
+    // The rows appear before the structures finish loading, and the
+    // selection is applied after; waiting for it rather than assuming the
+    // timing is what makes this check mean something.
+    await waitFor(() => rows[0].classList.contains('on'), 60000,
+                  'first pose selected by default');
     check(rows[0].classList.contains('on'), 'first pose selected by default');
 
     const cells = [...rows[0].querySelectorAll('td')].map((c) => c.textContent.trim());
@@ -134,6 +139,32 @@ if (started) {
       'summary line written', $('summary').textContent);
     check($('dl').getAttribute('href').includes('/poses/0.sdf'),
       'download link points at the pose SDF');
+
+    // Saving the pose on its own is not enough: people need it with the
+    // protein, in one file they can open or send.
+    check($('dlComplex').getAttribute('href').includes('/complex/0.pdb?pose=1'),
+      'complex link points at the selected pose',
+      $('dlComplex').getAttribute('href'));
+    check(/Pose 1 \+ protein/.test($('dlComplex').textContent),
+      'the complex button names the pose', $('dlComplex').textContent);
+    check($('dlReceptor').getAttribute('href').includes('/receptor_full.pdb'),
+      'the protein can be downloaded whole');
+    check($('dlBundle').getAttribute('href').includes('/bundle.zip'),
+      'everything can be downloaded as one archive');
+
+    for (const id of ['dl', 'dlComplex', 'dlReceptor', 'dlBundle']) {
+      const r = await fetch(BASE + $(id).getAttribute('href'));
+      const body = await r.arrayBuffer();
+      check(r.ok && body.byteLength > 0, `${id} actually downloads`,
+            `http ${r.status}, ${body.byteLength} bytes`);
+    }
+
+    // The complex must carry both halves, or it is just a renamed protein.
+    const cx = await (await fetch(
+      BASE + $('dlComplex').getAttribute('href'))).text();
+    check(/^ATOM  /m.test(cx) && /^HETATM.{15}Z/m.test(cx),
+      'the complex holds the protein and the pose');
+    check(/^CONECT/m.test(cx), 'the complex carries the ligand bonds');
 
     // Clicking another pose must swap the model and move the highlight.
     const before = calls.filter((c) => c.name === 'addModel').length;

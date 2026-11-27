@@ -613,6 +613,21 @@ function renderTabs(job) {
   }
 }
 
+/* The pose on its own is only half of what people need: looking at it, or
+ * sending it to anyone, means having the protein with it. */
+function updateSaveLinks(index) {
+  const job = state.jobId;
+  if (!job) return;
+  const rank = state.poseRank || 1;
+  const cx = $('dlComplex');
+  if (cx) {
+    cx.href = `/api/jobs/${job}/complex/${index}.pdb?pose=${rank}`;
+    cx.textContent = `Pose ${rank} + protein (PDB)`;
+  }
+  if ($('dlReceptor')) $('dlReceptor').href = `/api/jobs/${job}/receptor_full.pdb`;
+  if ($('dlBundle')) $('dlBundle').href = `/api/jobs/${job}/bundle.zip`;
+}
+
 /* -------------------------------------------------------- screening -- */
 function renderScreening(job) {
   const many = job.results.length > 1;
@@ -681,6 +696,7 @@ async function selectLigand(index) {
   renderTable(res);
   $('dl').href = `/api/jobs/${state.jobId}/poses/${index}.sdf`;
   $('dl').classList.toggle('hidden', !res.sdf);
+  updateSaveLinks(index);
 
   const summary = [`${res.n_modes} distinct binding mode${res.n_modes > 1 ? 's' : ''}`,
     `${res.poses.length} poses kept`, `${res.seconds}s`];
@@ -774,6 +790,8 @@ function splitSdf(sdf) {
 
 function showPose(rank) {
   state.poseRank = rank;
+  // The complex link names a pose, so it has to follow the selection.
+  updateSaveLinks(state.ligIndex);
   for (const tr of $('poseTable').querySelectorAll('tbody tr')) {
     tr.classList.toggle('on', Number(tr.dataset.rank) === rank);
   }
