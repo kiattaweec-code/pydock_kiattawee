@@ -29,6 +29,7 @@ from pydock import DockingConfig, GAConfig, __version__, run_docking
 from pydock import cavity as cavmod
 from pydock import ligand as ligmod
 from pydock import receptor as recmod
+from pydock import structure as structmod
 from pydock.dock import ligand_efficiency, resolve_site
 
 from . import prep as prepmod
@@ -286,7 +287,31 @@ def prepare(receptor: UploadFile = File(...),
             },
             "pockets": [],
             "reference": None,
+            "warnings": [],
         }
+
+        # A complex uploaded straight here is the quiet failure this whole
+        # program is most likely to hit: the engine keeps hetero atoms, so a
+        # bound ligand becomes receptor bulk filling the pocket, and nothing
+        # about the run looks wrong afterwards.
+        try:
+            raw = structmod.inspect_structure(str(rec_path))
+        except Exception:                                         # noqa: BLE001
+            raw = None
+        if raw is not None:
+            left = [c for c in raw.ligand_candidates() if c.n_heavy >= 6]
+            if left:
+                names = ", ".join(f"{c.label} ({c.formula})" for c in left[:3])
+                out["warnings"].append(
+                    f"This file still contains {names}"
+                    + (f" and {len(left) - 3} more" if len(left) > 3 else "")
+                    + ". pydock treats hetero atoms as part of the protein, so "
+                      "it would fill the pocket. Prepare the structure first.")
+        if rec.replaced_hydrogens:
+            out["warnings"].append(
+                f"{rec.replaced_hydrogens} hydrogens in the file were replaced "
+                f"with pydock's own, so hydroxyl and amine rotation stays "
+                f"available.")
 
         # Strip hydrogens from what the viewer receives: they treble the file
         # size and the cartoon and sticks do not need them.

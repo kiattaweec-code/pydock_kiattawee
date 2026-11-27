@@ -126,3 +126,6 @@ a.primary:hover { background: #5adbd0; }
   .layout > .setup { max-height: calc(100vh - 100px); overflow-y: auto; }
   .layout > .main { position: sticky; top: 16px; }
 }
+
+.siteWarnings { padding: 12px 14px 2px; }
+.siteWarnings .warn { margin: 0 0 10px; border-left-color: var(--amber); }

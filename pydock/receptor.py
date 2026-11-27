@@ -109,6 +109,10 @@ class Receptor:
     rot_h_atoms: np.ndarray = None       # (R, 3) hydrogen indices, -1 padded
     rot_h_ref: np.ndarray = None         # reference coords of those hydrogens
 
+    # What preparation did to the file, so callers can report it.
+    supplied_hydrogens: int = 0
+    replaced_hydrogens: int = 0
+
     @property
     def n_atoms(self) -> int:
         return self.coords.shape[0]
@@ -197,9 +201,22 @@ _BOND_LEN = {"N": 1.01, "O": 0.97, "S": 1.34}
 # --------------------------------------------------------------------------- #
 def prepare_receptor(path: str, keep_waters: bool = False,
                      rotate_oh: bool = True,
-                     exclude_resnames: set[str] | None = None) -> Receptor:
+                     exclude_resnames: set[str] | None = None,
+                     strip_hydrogens: bool = True) -> Receptor:
     atoms = parse_pdb(path, keep_waters=keep_waters,
                       exclude_resnames=exclude_resnames)
+
+    # Hydrogens that arrive in the file are replaced by default, because the
+    # placement below is also what builds the rotatable OH/SH/NH3+ genes: a
+    # protonated receptor used as-is scored with zero of them, losing 82
+    # degrees of freedom on a protein this size without saying anything.
+    # Pass strip_hydrogens=False to keep a protonation you chose deliberately,
+    # and accept that those torsions stay fixed.
+    supplied_h = sum(1 for a in atoms if a["element"] == "H")
+    replaced_h = 0
+    if supplied_h and strip_hydrogens:
+        atoms = [a for a in atoms if a["element"] != "H"]
+        replaced_h = supplied_h
 
     # Does the file already carry hydrogens?
     has_h = any(a["element"] == "H" for a in atoms)
@@ -417,6 +434,9 @@ def prepare_receptor(path: str, keep_waters: bool = False,
         rec.rot_h_axis_b = np.zeros(0, dtype=np.int64)
         rec.rot_h_atoms = np.zeros((0, 3), dtype=np.int64)
         rec.rot_h_ref = coords.copy()
+
+    rec.supplied_hydrogens = supplied_h
+    rec.replaced_hydrogens = replaced_h
     return rec
 
 

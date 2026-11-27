@@ -131,6 +131,17 @@ function selectSiteMode(mode) {
   if (btn && !btn.classList.contains('on')) btn.click();
 }
 
+/* A receptor that still holds its ligand is the quiet failure here, so the
+ * warning sits above the site, where it cannot be missed. */
+function renderWarnings(list) {
+  const box = $('siteWarnings');
+  if (!box) return;
+  box.innerHTML = list.map((w) =>
+    `<p class="warn">${w}${/Prepare the structure/.test(w)
+      ? ' <a href="prepare.html">Prepare it now</a>' : ''}</p>`).join('');
+  box.classList.toggle('hidden', list.length === 0);
+}
+
 /* ------------------------------------------- receptor preview fetch -- */
 function fileOf(name) {
   const input = $('form').elements[name];
@@ -167,6 +178,7 @@ async function prepareReceptor() {
     $('siteMeta').textContent =
       `${body.n_residues} residues · ${body.n_atoms} atoms`;
     renderPockets(body);
+    renderWarnings(body.warnings || []);
     await drawSiteStructure(body);
 
     // Opening box: the reference if there is one, else the best pocket.
